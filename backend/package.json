@@ -1,0 +1,14 @@
+{
+  "name": "tienda-local-backend",
+  "version": "1.0.0",
+  "description": "API REST de la app de tienda digital local (TFG)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "pg": "^8.23.1"
+  }
+}

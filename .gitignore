@@ -1,0 +1,15 @@
+# Dependencias y secretos (nunca se suben; el repositorio es público)
+node_modules/
+.env
+*.env.local
+
+# Archivos del editor y del sistema
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Android
+build/
+.gradle/
+local.properties
