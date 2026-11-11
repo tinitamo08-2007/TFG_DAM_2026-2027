@@ -5,6 +5,7 @@ require('dotenv').config({ quiet: true });
 
 const express = require('express');
 const pool = require('./db');
+const authRoutes = require('./routes/auth.routes');
 
 const app = express();
 const PUERTO = process.env.PORT || 3000;
@@ -28,6 +29,9 @@ app.get('/health/db', async (req, res) => {
     res.status(500).json({ estado: 'error', baseDeDatos: 'sin conexión' });
   }
 });
+
+// Rutas de autenticación (registro, y más adelante inicio de sesión)
+app.use('/api/v1/auth', authRoutes);
 
 // Arrancamos el servidor
 app.listen(PUERTO, () => {
