@@ -29,4 +29,9 @@ async function revocar(tokenHash) {
   await pool.query('UPDATE sesion SET revocado = TRUE WHERE token_hash = $1', [tokenHash]);
 }
 
-module.exports = { crear, buscarValida, revocar };
+// HU-04: al cambiar la contraseña se cierran todas las sesiones de ese usuario
+async function revocarTodas(usuarioId) {
+  await pool.query('UPDATE sesion SET revocado = TRUE WHERE usuario_id = $1', [usuarioId]);
+}
+
+module.exports = { crear, buscarValida, revocar, revocarTodas };

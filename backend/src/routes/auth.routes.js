@@ -18,4 +18,10 @@ router.post('/refresh', authController.refrescar);
 // POST /api/v1/auth/logout  (HU-03)
 router.post('/logout', authController.cerrarSesion);
 
+// POST /api/v1/auth/forgot-password  (HU-04)
+router.post('/forgot-password', authController.solicitarRestablecimiento);
+
+// POST /api/v1/auth/reset-password  (HU-04)
+router.post('/reset-password', authController.restablecerContrasena);
+
 module.exports = router;

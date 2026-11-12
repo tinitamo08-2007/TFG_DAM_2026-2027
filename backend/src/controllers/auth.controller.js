@@ -61,4 +61,32 @@ async function cerrarSesion(req, res) {
   }
 }
 
-module.exports = { registrar, iniciarSesion, refrescar, cerrarSesion };
+// HU-04: pedir el enlace de recuperación (responde siempre lo mismo)
+async function solicitarRestablecimiento(req, res) {
+  try {
+    await authService.solicitarRestablecimiento(req.body);
+    res.status(200).json({ mensaje: 'Si el correo está registrado, recibirás un enlace para cambiar la contraseña' });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.message });
+    }
+    console.error('Error al solicitar el restablecimiento:', error);
+    res.status(500).json({ mensaje: 'Error interno del servidor' });
+  }
+}
+
+// HU-04: cambiar la contraseña con el token
+async function restablecerContrasena(req, res) {
+  try {
+    await authService.restablecerContrasena(req.body);
+    res.status(200).json({ mensaje: 'Contraseña cambiada correctamente' });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.message });
+    }
+    console.error('Error al restablecer la contraseña:', error);
+    res.status(500).json({ mensaje: 'Error interno del servidor' });
+  }
+}
+
+module.exports = { registrar, iniciarSesion, refrescar, cerrarSesion, solicitarRestablecimiento, restablecerContrasena };
