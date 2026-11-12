@@ -33,4 +33,32 @@ async function iniciarSesion(req, res) {
   }
 }
 
-module.exports = { registrar, iniciarSesion };
+// HU-03: renovar el token de acceso con el refresh token
+async function refrescar(req, res) {
+  try {
+    const resultado = await authService.refrescar(req.body);
+    res.status(200).json(resultado);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.message });
+    }
+    console.error('Error al refrescar la sesión:', error);
+    res.status(500).json({ mensaje: 'Error interno del servidor' });
+  }
+}
+
+// HU-03: cerrar sesión
+async function cerrarSesion(req, res) {
+  try {
+    await authService.cerrarSesion(req.body);
+    res.status(200).json({ mensaje: 'Sesión cerrada' });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.message });
+    }
+    console.error('Error al cerrar sesión:', error);
+    res.status(500).json({ mensaje: 'Error interno del servidor' });
+  }
+}
+
+module.exports = { registrar, iniciarSesion, refrescar, cerrarSesion };

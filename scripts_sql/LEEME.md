@@ -8,5 +8,6 @@ Orden en el que se ejecutan:
 | 01_tablas_E1.sql | Crea las tablas usuario y token_restablecimiento (E1) | Conectado a `tienda_local` |
 | 02_prueba_E1.sql | Inserta datos de prueba y comprueba las restricciones | Conectado a `tienda_local` |
 | 03_login_intentos.sql | Añade a usuario las columnas intentos_fallidos y bloqueado_hasta (HU-02, bloqueo tras 5 fallos) | Conectado a `tienda_local` |
+| 04_sesiones.sql | Crea la tabla sesion con los refresh tokens (HU-03, sesión persistente y cierre de sesión) | Conectado a `tienda_local` |
 
 Cada vez que se añada una épica, se añade un script nuevo con el siguiente número.
