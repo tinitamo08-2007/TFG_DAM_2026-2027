@@ -2,6 +2,7 @@
 // Capa de SERVICIOS: aquí están las reglas de negocio del registro (HU-01 y HU-06).
 
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const usuarioRepository = require('../repositories/usuario.repository');
 
 // Crea un error con el código HTTP que debe devolver la API
@@ -13,6 +14,14 @@ function crearError(status, mensaje, campos) {
 }
 
 // Comprueba los datos que envía el usuario. Devuelve un objeto con un mensaje por cada campo mal.
+// Reglas del bloqueo de HU-02
+const MAX_INTENTOS = 5;
+const MINUTOS_BLOQUEO = 15;
+
+// Hash falso: se usa cuando el correo no existe, para que tarde lo mismo que con un correo real
+// y no se pueda adivinar qué correos están registrados mirando el tiempo de respuesta
+const HASH_FALSO = bcrypt.hashSync('contrasena-falsa', 10);
+
 function validarRegistro({ nombre, correo, contrasena, aceptaPolitica }) {
   const errores = {};
 
@@ -66,4 +75,55 @@ async function registrar(datos) {
   }
 }
 
-module.exports = { registrar };
+// HU-02: inicio de sesión
+async function iniciarSesion({ correo, contrasena }) {
+  // 1. Los dos campos son obligatorios
+  if (!correo || !contrasena) {
+    throw crearError(400, 'Introduce el correo y la contraseña');
+  }
+  if (!process.env.JWT_SECRET) {
+    throw new Error('Falta JWT_SECRET en el archivo .env');
+  }
+
+  const usuario = await usuarioRepository.buscarParaLogin(correo.trim().toLowerCase());
+
+  // 2. Si el correo no existe, comparamos con el hash falso y damos el mismo mensaje genérico
+  if (!usuario) {
+    await bcrypt.compare(contrasena, HASH_FALSO);
+    throw crearError(401, 'Correo o contraseña incorrectos');
+  }
+
+  // 3. Si la cuenta está bloqueada, no se comprueba nada más
+  if (usuario.bloqueado) {
+    throw crearError(429, 'Demasiados intentos fallidos. Inténtalo de nuevo en ' + usuario.minutos_restantes + ' minuto(s)');
+  }
+  // Si tuvo un bloqueo que ya terminó, empezamos de cero
+  if (usuario.bloqueado_hasta) {
+    await usuarioRepository.reiniciarIntentos(usuario.id);
+  }
+
+  // 4. Comprobar la contraseña
+  const correcta = await bcrypt.compare(contrasena, usuario.contrasena_hash);
+  if (!correcta) {
+    const fallo = await usuarioRepository.registrarFallo(usuario.id, MAX_INTENTOS, MINUTOS_BLOQUEO);
+    if (fallo.bloqueado) {
+      throw crearError(429, 'Demasiados intentos fallidos. La cuenta se bloquea ' + MINUTOS_BLOQUEO + ' minutos');
+    }
+    // Mensaje genérico: no dice si falló el correo o la contraseña
+    throw crearError(401, 'Correo o contraseña incorrectos');
+  }
+
+  // 5. Acceso correcto: quitamos los fallos y creamos el token (JWT)
+  await usuarioRepository.reiniciarIntentos(usuario.id);
+  const token = jwt.sign({ rol: usuario.rol }, process.env.JWT_SECRET, {
+    subject: String(usuario.id),
+    expiresIn: process.env.JWT_EXPIRES || '15m',
+  });
+
+  return {
+    token,
+    usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol },
+  };
+}
+
+module.exports = { registrar, iniciarSesion };
