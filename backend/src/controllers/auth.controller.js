@@ -19,4 +19,18 @@ async function registrar(req, res) {
   }
 }
 
-module.exports = { registrar };
+// HU-02: inicio de sesión
+async function iniciarSesion(req, res) {
+  try {
+    const resultado = await authService.iniciarSesion(req.body);
+    res.status(200).json(resultado);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.message, campos: error.campos });
+    }
+    console.error('Error en el inicio de sesión:', error);
+    res.status(500).json({ mensaje: 'Error interno del servidor' });
+  }
+}
+
+module.exports = { registrar, iniciarSesion };
