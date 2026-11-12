@@ -12,4 +12,10 @@ router.post('/register', authController.registrar);
 // POST /api/v1/auth/login
 router.post('/login', authController.iniciarSesion);
 
+// POST /api/v1/auth/refresh  (HU-03)
+router.post('/refresh', authController.refrescar);
+
+// POST /api/v1/auth/logout  (HU-03)
+router.post('/logout', authController.cerrarSesion);
+
 module.exports = router;

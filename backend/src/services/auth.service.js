@@ -3,7 +3,9 @@
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const usuarioRepository = require('../repositories/usuario.repository');
+const sesionRepository = require('../repositories/sesion.repository');
 
 // Crea un error con el código HTTP que debe devolver la API
 function crearError(status, mensaje, campos) {
@@ -17,6 +19,9 @@ function crearError(status, mensaje, campos) {
 // Reglas del bloqueo de HU-02
 const MAX_INTENTOS = 5;
 const MINUTOS_BLOQUEO = 15;
+
+// HU-03: los refresh tokens valen 30 días
+const DIAS_REFRESH = 30;
 
 // Hash falso: se usa cuando el correo no existe, para que tarde lo mismo que con un correo real
 // y no se pueda adivinar qué correos están registrados mirando el tiempo de respuesta
@@ -75,6 +80,19 @@ async function registrar(datos) {
   }
 }
 
+// HU-03: crea el token de acceso (JWT) de 15 minutos
+function crearToken(usuario) {
+  return jwt.sign({ rol: usuario.rol }, process.env.JWT_SECRET, {
+    subject: String(usuario.id),
+    expiresIn: process.env.JWT_EXPIRES || '15m',
+  });
+}
+
+// HU-03: el refresh token se guarda como hash SHA-256 (no en claro)
+function hashearToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 // HU-02: inicio de sesión
 async function iniciarSesion({ correo, contrasena }) {
   // 1. Los dos campos son obligatorios
@@ -115,15 +133,37 @@ async function iniciarSesion({ correo, contrasena }) {
 
   // 5. Acceso correcto: quitamos los fallos y creamos el token (JWT)
   await usuarioRepository.reiniciarIntentos(usuario.id);
-  const token = jwt.sign({ rol: usuario.rol }, process.env.JWT_SECRET, {
-    subject: String(usuario.id),
-    expiresIn: process.env.JWT_EXPIRES || '15m',
-  });
+  const token = crearToken(usuario);
+
+  // HU-03: refresh token aleatorio. Al usuario se le da el token; en la base de datos solo va su hash
+  const refreshToken = crypto.randomBytes(48).toString('hex');
+  await sesionRepository.crear(usuario.id, hashearToken(refreshToken), DIAS_REFRESH);
 
   return {
     token,
+    refreshToken,
     usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol },
   };
 }
 
-module.exports = { registrar, iniciarSesion };
+// HU-03: pide un token de acceso nuevo usando el refresh token (sesión persistente)
+async function refrescar({ refreshToken }) {
+  if (!refreshToken) {
+    throw crearError(400, 'Falta el refresh token');
+  }
+  const usuario = await sesionRepository.buscarValida(hashearToken(refreshToken));
+  if (!usuario) {
+    throw crearError(401, 'La sesión no es válida o ha caducado');
+  }
+  return { token: crearToken(usuario), usuario };
+}
+
+// HU-03: cierre de sesión. Revoca el refresh token para que no se pueda volver a usar
+async function cerrarSesion({ refreshToken }) {
+  if (!refreshToken) {
+    throw crearError(400, 'Falta el refresh token');
+  }
+  await sesionRepository.revocar(hashearToken(refreshToken));
+}
+
+module.exports = { registrar, iniciarSesion, refrescar, cerrarSesion };
