@@ -59,4 +59,12 @@ async function reiniciarIntentos(id) {
   );
 }
 
-module.exports = { buscarPorCorreo, crear, buscarParaLogin, registrarFallo, reiniciarIntentos };
+// HU-04: cambia la contraseña y quita cualquier bloqueo de la cuenta
+async function actualizarContrasena(id, contrasenaHash) {
+  await pool.query(
+    'UPDATE usuario SET contrasena_hash = $2, intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = $1',
+    [id, contrasenaHash]
+  );
+}
+
+module.exports = { buscarPorCorreo, crear, buscarParaLogin, registrarFallo, reiniciarIntentos, actualizarContrasena };

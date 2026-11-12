@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const usuarioRepository = require('../repositories/usuario.repository');
 const sesionRepository = require('../repositories/sesion.repository');
+const restablecimientoRepository = require('../repositories/restablecimiento.repository');
 
 // Crea un error con el código HTTP que debe devolver la API
 function crearError(status, mensaje, campos) {
@@ -22,6 +23,9 @@ const MINUTOS_BLOQUEO = 15;
 
 // HU-03: los refresh tokens valen 30 días
 const DIAS_REFRESH = 30;
+
+// HU-04: el enlace para cambiar la contraseña vale 60 minutos
+const MINUTOS_RESTABLECER = 60;
 
 // Hash falso: se usa cuando el correo no existe, para que tarde lo mismo que con un correo real
 // y no se pueda adivinar qué correos están registrados mirando el tiempo de respuesta
@@ -166,4 +170,43 @@ async function cerrarSesion({ refreshToken }) {
   await sesionRepository.revocar(hashearToken(refreshToken));
 }
 
-module.exports = { registrar, iniciarSesion, refrescar, cerrarSesion };
+// HU-04: pide el enlace para recuperar la contraseña
+async function solicitarRestablecimiento({ correo }) {
+  if (!correo) {
+    throw crearError(400, 'Introduce tu correo');
+  }
+  const usuario = await usuarioRepository.buscarPorCorreo(correo.trim().toLowerCase());
+
+  // Si el correo existe, se crea el token. Si no existe, no se hace nada,
+  // pero la respuesta es la misma: así no se puede saber qué correos están registrados.
+  if (usuario) {
+    const token = crypto.randomBytes(32).toString('hex');
+    await restablecimientoRepository.crear(usuario.id, hashearToken(token), MINUTOS_RESTABLECER);
+    // De momento NO se envía correo: el enlace se muestra en la consola del servidor.
+    // Más adelante aquí se llamará al servicio de correo.
+    console.log('[HU-04] Token para restablecer la contraseña de ' + correo + ': ' + token);
+  }
+}
+
+// HU-04: cambia la contraseña usando el token recibido
+async function restablecerContrasena({ token, contrasena }) {
+  if (!token) {
+    throw crearError(400, 'Falta el token');
+  }
+  if (!contrasena || contrasena.length < 8) {
+    throw crearError(400, 'La contraseña debe tener al menos 8 caracteres');
+  }
+
+  // Gastamos el token (solo vale una vez y mientras no haya caducado)
+  const usuarioId = await restablecimientoRepository.gastar(hashearToken(token));
+  if (!usuarioId) {
+    throw crearError(400, 'El enlace no es válido o ha caducado');
+  }
+
+  const contrasenaHash = await bcrypt.hash(contrasena, 10);
+  await usuarioRepository.actualizarContrasena(usuarioId, contrasenaHash);
+  // Por seguridad, se cierran todas las sesiones abiertas de ese usuario
+  await sesionRepository.revocarTodas(usuarioId);
+}
+
+module.exports = { registrar, iniciarSesion, refrescar, cerrarSesion, solicitarRestablecimiento, restablecerContrasena };
